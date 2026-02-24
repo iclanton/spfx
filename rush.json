@@ -559,6 +559,12 @@
       "projectFolder": "examples/webpart-noframework",
       "reviewCategory": "templates",
       "tags": [ ]
+    },
+    {
+      "packageName": "@spfx-template/webpart-react",
+      "projectFolder": "examples/webpart-react",
+      "reviewCategory": "templates",
+      "tags": [ ]
     }
   ]
 }
