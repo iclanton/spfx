@@ -86,6 +86,15 @@ const TEMPLATE_CONFIGS: TemplateConfig[] = [
     componentDescription: 'Minimal ACE Description'
   },
   {
+    libraryName: '@spfx-template/extension-application-customizer',
+    templateName: 'extension-application-customizer',
+    templatePath: path.join(REPO_ROOT, 'templates/extension-application-customizer'),
+    localTemplatePath: path.join(REPO_ROOT, 'templates'),
+    componentName: 'Minimal',
+    componentAlias: 'Minimal',
+    componentDescription: 'Minimal Description'
+  },
+  {
     libraryName: '@spfx-template/extension-fieldcustomizer-minimal',
     templateName: 'extension-fieldcustomizer-minimal',
     templatePath: path.join(REPO_ROOT, 'templates/extension-fieldcustomizer-minimal'),
