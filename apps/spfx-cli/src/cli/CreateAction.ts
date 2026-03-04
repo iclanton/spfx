@@ -203,7 +203,7 @@ export class CreateAction extends CommandLineAction {
           solution_name: solutionName,
           eslintProfile: 'react',
           libraryName: this._libraryName.value,
-          versionBadge: `https://img.shields.io/badge/version-${template.spfxVersion || '1.22.2'}-green.svg`,
+          spfxVersion: template.spfxVersion,
           componentId: componentId,
           featureId: featureId,
           solutionId: solutionId,
