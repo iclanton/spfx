@@ -15,6 +15,7 @@ import {
 } from '@rushstack/ts-command-line';
 import {
   LocalFileSystemRepositorySource,
+  PublicGitHubRepositorySource,
   type SPFxTemplateCollection,
   SPFxTemplateRepositoryManager,
   type SPFxTemplate,
@@ -22,6 +23,8 @@ import {
 } from '@microsoft/spfx-template-api';
 
 import { SOLUTION_NAME_PATTERN } from '../../utilcities/validation';
+
+const DEFAULT_GITHUB_REPO: string = 'https://github.com/SharePoint/spfx';
 
 // Deterministic namespace for CI mode GUIDs, derived from the well-known URL
 // namespace: uuidv5('spfx-cli:ci', '6ba7b810-9dad-11d1-80b4-00c04fd430c8')
@@ -50,6 +53,8 @@ export class CreateAction extends CommandLineAction {
   private readonly _componentAlias: CommandLineStringParameter;
   private readonly _componentDescription: CommandLineStringParameter;
   private readonly _solutionName: CommandLineStringParameter;
+  private readonly _templateUrl: CommandLineStringParameter;
+  private readonly _spfxVersion: CommandLineStringParameter;
 
   public constructor(terminal: Terminal) {
     super({
@@ -111,6 +116,21 @@ export class CreateAction extends CommandLineAction {
       argumentName: 'SOLUTION_NAME',
       description: 'The solution name. If not provided, defaults to the kebab-case component name.'
     });
+
+    this._templateUrl = this.defineStringParameter({
+      parameterLongName: '--template-url',
+      argumentName: 'URL',
+      description: `URL of the GitHub template repository. Defaults to ${DEFAULT_GITHUB_REPO}.`,
+      environmentVariable: 'SPFX_TEMPLATE_REPO_URL'
+    });
+
+    this._spfxVersion = this.defineStringParameter({
+      parameterLongName: '--spfx-version',
+      argumentName: 'VERSION',
+      description:
+        'The branch name in the template repository to use (e.g., "1.22", "1.23-rc.0"). ' +
+        "Defaults to the repository's default branch (main)."
+    });
   }
 
   protected async onExecuteAsync(): Promise<void> {
@@ -130,12 +150,44 @@ export class CreateAction extends CommandLineAction {
 
       const manager: SPFxTemplateRepositoryManager = new SPFxTemplateRepositoryManager();
 
-      for (const localPath of this._localTemplateSources.values) {
-        this._terminal.writeLine(`Adding local template source: ${localPath}`);
-        manager.addSource(new LocalFileSystemRepositorySource(localPath));
+      if (this._localTemplateSources.values.length > 0) {
+        if (this._spfxVersion.value !== undefined) {
+          this._terminal.writeWarningLine(
+            `${this._spfxVersion.longName} is ignored when ${this._localTemplateSources.longName} is specified.`
+          );
+        }
+        for (const localPath of this._localTemplateSources.values) {
+          this._terminal.writeLine(`Adding local template source: ${localPath}`);
+          manager.addSource(new LocalFileSystemRepositorySource(localPath));
+        }
+      } else {
+        const rawUrl: string = (this._templateUrl.value ?? '').trim() || DEFAULT_GITHUB_REPO;
+        const { repoUrl, urlBranch } = parseGitHubUrlAndRef(rawUrl);
+
+        const spfxVersion: string | undefined = this._spfxVersion.value;
+        if (spfxVersion !== undefined && urlBranch !== undefined) {
+          this._terminal.writeWarningLine(
+            `${this._templateUrl.longName} contains a branch ('/tree/${urlBranch}'). ` +
+              `${this._spfxVersion.longName} "${spfxVersion}" will take precedence.`
+          );
+        }
+        const ref: string | undefined = spfxVersion ?? urlBranch;
+
+        this._terminal.writeLine(`Using GitHub template source: ${repoUrl}${ref ? ` (branch: ${ref})` : ''}`);
+        manager.addSource(new PublicGitHubRepositorySource(repoUrl, ref, this._terminal));
       }
 
-      const templates: SPFxTemplateCollection = await manager.getTemplatesAsync();
+      let templates: SPFxTemplateCollection;
+      try {
+        templates = await manager.getTemplatesAsync();
+      } catch (fetchError: unknown) {
+        const fetchMessage: string = fetchError instanceof Error ? fetchError.message : String(fetchError);
+        throw new Error(
+          `Failed to fetch templates. If you are offline or behind a firewall, ` +
+            `use ${this._localTemplateSources.longName} to specify a local template source. Details: ${fetchMessage}`,
+          { cause: fetchError }
+        );
+      }
 
       this._terminal.writeLine(templates.toString());
 
@@ -209,6 +261,25 @@ export class CreateAction extends CommandLineAction {
       throw error;
     }
   }
+}
+
+/**
+ * Parses a GitHub (or GHE) URL that may contain a `/tree/<ref>` path segment.
+ * Returns the clean repository URL (without `.git` or trailing slashes) and the optional branch ref.
+ */
+function parseGitHubUrlAndRef(rawUrl: string): { repoUrl: string; urlBranch: string | undefined } {
+  const normalized: string = rawUrl.trim().replace(/\/+$/, '');
+  // Match https://<host>/owner/repo[.git]/tree/<ref> — host-agnostic to support GHE.
+  // Only the first path segment after /tree/ is captured as the ref; subdirectory
+  // suffixes (e.g. /tree/main/some/subdir) are ignored.
+  const treeMatch: RegExpMatchArray | null = normalized.match(
+    /^(?<repo>https?:\/\/[^/]+\/[^/]+\/[^/]+?)(?:\.git)?\/tree\/(?<ref>[^/]+)/
+  );
+  if (treeMatch?.groups) {
+    const { repo, ref } = treeMatch.groups as { repo: string; ref: string };
+    return { repoUrl: repo, urlBranch: ref };
+  }
+  return { repoUrl: normalized.replace(/\.git$/, ''), urlBranch: undefined };
 }
 
 /**
