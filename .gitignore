@@ -146,6 +146,14 @@ npm-debug.log*
 # Dependency directories
 node_modules
 
+# Rush files
+common/temp/**
+common/deploy/
+common/temp/
+common/drop/
+common/autoinstallers/*/.npmrc
+.rush/
+
 # Build generated files
 dist
 lib
@@ -176,6 +184,8 @@ obj
 
 # Styles Generated Code
 *.scss.ts
+
+
 
 # Claude
 .claude/*.local.json
