@@ -114,8 +114,8 @@ extends:
 
               - template: /common/config/azure-pipelines/templates/run-repo-toolbox.yaml@self
                 parameters:
-                  Arguments: emit-github-vars-and-tag-build
-                  DisplayName: 'Tag build and emit GitHub pipeline variables'
+                  Arguments: emit-github-vars
+                  DisplayName: 'Emit GitHub pipeline variables'
                   Name: EmitGitHubVars
 
               - template: /common/config/azure-pipelines/templates/find-bump-pipeline-run.yaml@self

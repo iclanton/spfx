@@ -1,20 +1,26 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`CommandLineHelp prints the help: create-github-releases 1`] = `
-"usage: repo-toolbox create-github-releases [-h] --packages-path PATH
-                                           --commit-sha SHA --github-token
-                                           TOKEN --repo-slug SLUG
+"usage: repo-toolbox create-github-releases [-h] --github-token TOKEN
+                                           --packages-path PATH --commit-sha
+                                           SHA --repo-slug SLUG
 
+
+Creates a GitHub release and tag for each .tgz file in the specified
+directory. Tags are formatted as @scope/package_vX.Y.Z. Release notes are
+sourced from the package CHANGELOG.md. Versions with a pre-release suffix (e.
+g. -alpha.1) are marked as GitHub pre-releases. Packages whose release
+already exists are skipped.
 
 Optional arguments:
   -h, --help            Show this help message and exit.
+  --github-token TOKEN  GitHub token. Accepts a raw installation token (e.g.
+                        \`ghs_xxx\`) or a full Authorization header value (e.g.
+                        \`basic <base64>\`). This parameter may alternatively
+                        be specified via the GITHUB_TOKEN environment
+                        variable.
   --packages-path PATH  Path to directory containing .tgz package files.
   --commit-sha SHA      The commit SHA to tag.
-  --github-token TOKEN  GitHub Authorization header value for creating
-                        releases (format: \`basic <base64>\` as emitted by
-                        emit-github-vars-and-tag-build). This parameter may
-                        alternatively be specified via the GITHUB_TOKEN
-                        environment variable.
   --repo-slug SLUG      GitHub repository slug in the form owner/repo.
 "
 `;
@@ -55,11 +61,21 @@ Optional arguments:
 "
 `;
 
-exports[`CommandLineHelp prints the help: emit-github-vars-and-tag-build 1`] = `
-"usage: repo-toolbox emit-github-vars-and-tag-build [-h]
+exports[`CommandLineHelp prints the help: emit-github-vars 1`] = `
+"usage: repo-toolbox emit-github-vars [-h] [--github-token TOKEN]
+
+Reads the GitHub repository slug from the local git remote and the
+authorization token from --github-token / GITHUB_TOKEN (if set) or the git
+checkout credential, then emits them as GitHubRepoSlug and GitHubToken AzDO
+output variables for use by downstream stages.
 
 Optional arguments:
-  -h, --help  Show this help message and exit.
+  -h, --help            Show this help message and exit.
+  --github-token TOKEN  GitHub token. Accepts a raw installation token (e.g.
+                        \`ghs_xxx\`) or a full Authorization header value (e.g.
+                        \`basic <base64>\`). This parameter may alternatively
+                        be specified via the GITHUB_TOKEN environment
+                        variable.
 "
 `;
 
@@ -106,9 +122,10 @@ Positional arguments:
     create-or-update-pr
                         Creates or updates a pull request for the repository.
                         To be used only on AzDO pipelines.
-    emit-github-vars-and-tag-build
-                        Tags the AzDO build and emits GitHub repo slug, auth
-                        token, and bump SHA as AzDO output variables.
+    emit-github-vars    Emits GitHub repo slug and auth token as AzDO output
+                        variables.
+    tag-build           Tags the AzDO build with the bump commit SHA and
+                        emits it as an output variable.
     find-bump-pipeline-run
                         If the current commit is a version bump merge, finds
                         the originating bump pipeline run.
@@ -123,6 +140,18 @@ Optional arguments:
 
 [bold]For detailed help about a specific command, use: repo-toolbox <command>
 -h[normal]
+"
+`;
+
+exports[`CommandLineHelp prints the help: tag-build 1`] = `
+"usage: repo-toolbox tag-build [-h]
+
+Reads the HEAD commit SHA, emits it as the BumpSha AzDO output variable, and
+tags the current build with a structured tag so that find-bump-pipeline-run
+can locate this run later.
+
+Optional arguments:
+  -h, --help  Show this help message and exit.
 "
 `;
 
