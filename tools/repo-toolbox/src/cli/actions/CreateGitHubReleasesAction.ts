@@ -6,31 +6,39 @@ import type { OctokitResponse, RequestError } from '@octokit/types';
 import type { ITerminal } from '@rushstack/terminal';
 import type { IRequiredCommandLineStringParameter } from '@rushstack/ts-command-line';
 import { Async, FileSystem, type FolderItem, type IPackageJson } from '@rushstack/node-core-library';
-import { CommandLineAction } from '@rushstack/ts-command-line';
 
-import { GitHubClient } from '../../utilities/GitHubClient';
+import {
+  GitHubClient,
+  type IGitHubAuthorizationHeader,
+  parseGitHubAuthorizationHeader
+} from '../../utilities/GitHubClient';
 import {
   readChangelogSectionFromTgzAsync,
   readPackageInfoFromTgzAsync
 } from '../../utilities/PackageTgzUtilities';
+import { GitHubTokenActionBase } from './GitHubTokenActionBase';
 
 /**
  * Creates GitHub releases (and their associated tags) for each .tgz package in a directory.
  * Tags are formatted as `@scope/package_vX.Y.Z`, matching the rushstack convention.
  * Release notes are populated from the corresponding CHANGELOG.md section in the package.
  */
-export class CreateGitHubReleasesAction extends CommandLineAction {
+export class CreateGitHubReleasesAction extends GitHubTokenActionBase<true> {
   private readonly _terminal: ITerminal;
   private readonly _packagesPathParameter: IRequiredCommandLineStringParameter;
   private readonly _commitShaParameter: IRequiredCommandLineStringParameter;
-  private readonly _githubTokenParameter: IRequiredCommandLineStringParameter;
   private readonly _repoSlugParameter: IRequiredCommandLineStringParameter;
 
   public constructor(terminal: ITerminal) {
     super({
       actionName: 'create-github-releases',
       summary: 'Creates a GitHub release for each .tgz package in a directory.',
-      documentation: ''
+      documentation:
+        'Creates a GitHub release and tag for each .tgz file in the specified directory. Tags are ' +
+        'formatted as @scope/package_vX.Y.Z. Release notes are sourced from the package CHANGELOG.md. ' +
+        'Versions with a pre-release suffix (e.g. -alpha.1) are marked as GitHub pre-releases. ' +
+        'Packages whose release already exists are skipped.',
+      githubTokenRequired: true
     });
 
     this._terminal = terminal;
@@ -49,15 +57,6 @@ export class CreateGitHubReleasesAction extends CommandLineAction {
       required: true
     });
 
-    this._githubTokenParameter = this.defineStringParameter({
-      parameterLongName: '--github-token',
-      argumentName: 'TOKEN',
-      environmentVariable: 'GITHUB_TOKEN',
-      description:
-        'GitHub Authorization header value for creating releases (format: `basic <base64>` as emitted by emit-github-vars-and-tag-build).',
-      required: true
-    });
-
     this._repoSlugParameter = this.defineStringParameter({
       parameterLongName: '--repo-slug',
       argumentName: 'SLUG',
@@ -71,7 +70,7 @@ export class CreateGitHubReleasesAction extends CommandLineAction {
     const terminal: ITerminal = this._terminal;
     const packagesPath: string = this._packagesPathParameter.value;
     const commitSha: string = this._commitShaParameter.value;
-    const authorizationHeader: string = this._githubTokenParameter.value;
+    const rawAuthorizationHeader: string = this._githubTokenParameter.value;
     const repoSlug: string = this._repoSlugParameter.value;
 
     const folderItems: FolderItem[] = await FileSystem.readFolderItemsAsync(packagesPath);
@@ -87,6 +86,8 @@ export class CreateGitHubReleasesAction extends CommandLineAction {
       throw new Error(`No .tgz packages found in ${packagesPath}`);
     }
 
+    const authorizationHeader: IGitHubAuthorizationHeader =
+      parseGitHubAuthorizationHeader(rawAuthorizationHeader);
     const gitHubClient: GitHubClient = await GitHubClient.createGitHubClientFromTokenAndRepoSlugAsync({
       authorizationHeader,
       repoSlug
@@ -123,19 +124,28 @@ export class CreateGitHubReleasesAction extends CommandLineAction {
           });
           terminal.writeLine(`Created release: ${tag}`);
         } catch (e: unknown) {
-          if (e instanceof RequestError && e.status === 422) {
-            const response: OctokitResponse<RequestError> | undefined = e.response as
-              | OctokitResponse<RequestError>
-              | undefined;
-            const responseErrors: RequestError['errors'] = response?.data?.errors;
+          if (e instanceof RequestError) {
+            const { status, message, response } = e;
+            const responseData: RequestError | undefined = (
+              response as OctokitResponse<RequestError> | undefined
+            )?.data;
+            const responseErrors: RequestError['errors'] = responseData?.errors;
 
-            const alreadyExists: boolean =
+            if (
+              status === 422 &&
               Array.isArray(responseErrors) &&
-              responseErrors.some((error) => error.code === 'already_exists');
-
-            if (alreadyExists) {
+              responseErrors.some((error) => error.code === 'already_exists')
+            ) {
               terminal.writeLine(`Release already exists for ${tag}; skipping.`);
               return;
+            } else {
+              // Newlines break the single-line ##vso logging command format.
+              const sanitizedMessage: string = message.replace(/[\r\n]+/g, ' ');
+              terminal.writeLine(
+                `##vso[task.logissue type=error]GitHub API error creating release ${tag}: ` +
+                  `HTTP ${status} — ${sanitizedMessage}. ` +
+                  (responseData ? `response data: ${JSON.stringify(responseData)}` : '')
+              );
             }
           }
 
