@@ -10,7 +10,7 @@ export { ServeJsonMergeHelper } from './ServeJsonMergeHelper';
 export { SPFxTemplateWriter, type IWriteOptions } from './SPFxTemplateWriter';
 export { type ITemplateOutputEntry, TemplateOutput } from './TemplateOutput';
 export {
-  type VALID_PACKAGE_MANAGERS,
+  VALID_PACKAGE_MANAGERS,
   type PackageManager,
   tryReadPackageManagerFromPackageJsonEnginesAsync,
   writePackageManagerToPackageJsonEnginesAsync

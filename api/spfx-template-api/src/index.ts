@@ -47,7 +47,7 @@ export {
   type IWriteOptions,
   type ITemplateOutputEntry,
   TemplateOutput,
-  type VALID_PACKAGE_MANAGERS,
+  VALID_PACKAGE_MANAGERS,
   type PackageManager,
   tryReadPackageManagerFromPackageJsonEnginesAsync,
   writePackageManagerToPackageJsonEnginesAsync
