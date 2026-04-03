@@ -179,8 +179,5 @@ coverage
 bin
 obj
 
-# Styles Generated Code
-*.scss.ts
-
 # Claude
 .claude/*.local.json
