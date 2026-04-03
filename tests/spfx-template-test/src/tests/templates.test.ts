@@ -228,18 +228,28 @@ interface IGetAllFilesOptions {
  */
 async function* getAllFilesAsync(options: IGetAllFilesOptions): AsyncIterable<string> {
   const { dir, baseDir = dir, ignoreMatcher } = options;
-  const entries = await FileSystem.readFolderItemsAsync(dir);
-  for (const entry of entries) {
-    const fullPath = `${dir}/${entry.name}`;
-    const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+  let entries;
+  try {
+    entries = await FileSystem.readFolderItemsAsync(dir);
+  } catch (error) {
+    if (!FileSystem.isNotExistError(error)) {
+      throw error;
+    }
+  }
 
-    // Check if this path should be ignored
-    if (!ignoreMatcher.ignores(relativePath)) {
-      if (entry.isDirectory()) {
-        yield* getAllFilesAsync({ dir: fullPath, baseDir, ignoreMatcher });
-      } else {
-        // Return relative path from baseDir
-        yield path.relative(baseDir, fullPath);
+  if (entries) {
+    for (const entry of entries) {
+      const fullPath = `${dir}/${entry.name}`;
+      const relativePath = path.relative(baseDir, fullPath).replace(/\\/g, '/');
+
+      // Check if this path should be ignored
+      if (!ignoreMatcher.ignores(relativePath)) {
+        if (entry.isDirectory()) {
+          yield* getAllFilesAsync({ dir: fullPath, baseDir, ignoreMatcher });
+        } else {
+          // Return relative path from baseDir
+          yield path.relative(baseDir, fullPath);
+        }
       }
     }
   }
